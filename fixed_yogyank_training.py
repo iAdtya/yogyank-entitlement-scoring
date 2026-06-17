@@ -160,6 +160,20 @@ def train_model():
     print(f"PM-Kisan policy applied to {(test_pm_kisan == 'No').sum()} farmers "
           f"(-{PM_KISAN_PENALTY:.0f} each), separate from the model.")
 
+    # ---- Explainability: feature importances + per-farmer reason codes ----
+    # Pull readable feature names out of the fitted pipeline (numeric names +
+    # the one-hot column names) and pair them with the model's importances.
+    ohe = model.named_steps["preprocess"].named_transformers_["cat"].named_steps["onehot"]
+    feat_names = numeric_cols + list(ohe.get_feature_names_out(categorical_cols))
+    importances = dict(sorted(
+        zip(feat_names, model.named_steps["xgb"].feature_importances_.tolist()),
+        key=lambda kv: kv[1], reverse=True,
+    ))
+    train_medians = X_train[numeric_cols].median()
+    print(f"Top features: {list(importances)[:5]}")
+    print(f"Example reason codes (first 2024 farmer): "
+          f"{reason_codes(X_test.iloc[0], importances, train_medians)}")
+
     # ---- Save reproducible artifacts (for review / re-running) ----
     # Everything a reviewer needs to reproduce and audit this run: the full
     # pipeline, the feature contract, the validation result, and version info.
@@ -186,6 +200,8 @@ def train_model():
             "random_state": 42,
             "pm_kisan_penalty": PM_KISAN_PENALTY,
         }, f, indent=2)
+    with open("artifacts/feature_importances.json", "w") as f:
+        json.dump(importances, f, indent=2)
     print("Artifacts saved to ./artifacts/")
 
 

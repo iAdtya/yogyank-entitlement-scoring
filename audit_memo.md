@@ -53,5 +53,6 @@ timing-sensitive (would leak if measured *after* scoring); excluded
 - **Would not trust yet:** the exact accuracy and the timing assumptions on
   liability/rainfall/NDVI — the split rests on only 3 years with a single-year
   holdout, so R² is a direction, not a guarantee.
-- **Would improve with more time:** wrap preprocessing in a saved `Pipeline`,
-  use rolling time-series cross-validation.
+- **Would improve with more time:** rolling time-series cross-validation (the
+  single-year holdout is luck-sensitive) and SHAP-based signed reason codes
+  (the current rule-based codes are a stable, dependency-free fallback).

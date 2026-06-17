@@ -9,8 +9,12 @@ pip install -r requirements.txt
 python fixed_yogyank_training.py
 ```
 
-## Files generated
-- `xgboost_baseline.pkl` — trained model.
+## Files generated (in `artifacts/`, created when you run the script)
+- `model_pipeline.pkl` — full pipeline (impute + one-hot + XGBoost).
+- `feature_list.json` — model features, policy feature, target.
+- `validation_summary.json` — holdout R² / MAE and the split rule.
+- `feature_importances.json` — global feature importances.
+- `metadata.json` — xgboost version, random seed, PM-Kisan constant.
 
 ## Key assumptions (feature availability)
 - **Dropped (leakage):** `defaulted_in_next_12_months` — a future outcome.
@@ -25,10 +29,12 @@ python fixed_yogyank_training.py
 ## Completed vs skipped
 - **Completed:** leakage removal, time-based validation, one-hot encoding,
   missing-value imputation, feature expansion + availability reasoning,
-  model/policy separation, audit memo.
-- **Skipped (time-box):** saved preprocessing `Pipeline`, full artifact set
-  (schema/metadata/reason codes), rolling cross-validation, hyperparameter
-  tuning. See `audit_memo.md` §3.
+  model/policy separation, saved preprocessing `Pipeline`, reproducible
+  artifacts (feature list, metrics, importances, metadata), reason codes,
+  audit memo.
+- **Skipped (time-box):** rolling time-series cross-validation and
+  hyperparameter tuning (tuning deliberately skipped — the brief values
+  judgement over leaderboard accuracy). See `audit_memo.md` §3.
 
 ## Validation approach
 **Time-based split:** train on application years < 2024, test on 2024 — this
