@@ -23,13 +23,27 @@ def train_model():
     # print("Applying PM Kisan business policy...")
     # df.loc[df["pm_kisan_status"] == "No", "target_entitlement_score"] -= 150
 
-    features = [
+    # Features assumed known at/before the scoring (application) date.
+    numeric_cols = [
         "land_area_acres",
+        "historical_repayment_score",
+        "liability_ratio_pct",
+        "annual_income_inr",
+        "rainfall_deviation_pct",
+        "ndvi_score",
+    ]
+    categorical_cols = [
         "crop_type",
         "pm_kisan_status",
-        "historical_repayment_score",
-        # "defaulted_in_next_12_months", removed — unavailable for new farmers (target leakage)
+        "district",
+        "irrigation_type",
+        "land_ownership",
+        "soil_type",
+        "sales_channel",
     ]
+    features = numeric_cols + categorical_cols
+    # Excluded: "defaulted_in_next_12_months" (target leakage), "farmer_id"
+    # (identifier), "application_year" (used only for the time split).
 
     X = df[features].copy()
     y = df["target_entitlement_score"]
@@ -42,7 +56,7 @@ def train_model():
     print("One-hot encoding categorical variables...")
     # One-hot avoids the fake ordering LabelEncoder imposes on categories
     # (e.g. Rice=2 > Cotton=0), which would mislead the model.
-    X = pd.get_dummies(X, columns=["crop_type", "pm_kisan_status"])
+    X = pd.get_dummies(X, columns=categorical_cols)
 
     # print("Splitting data...")
     # X_train, X_test, y_train, y_test = train_test_split(
@@ -54,6 +68,13 @@ def train_model():
     is_train = df["application_year"] < 2024
     X_train, X_test = X[is_train], X[~is_train]
     y_train, y_test = y[is_train], y[~is_train]
+
+    # Handle missing values (rainfall_deviation_pct and ndvi_score are ~15% null).
+    # Impute with the TRAIN median only, then apply to both, so no test-set
+    # information leaks into training.
+    train_medians = X_train[numeric_cols].median()
+    X_train = X_train.fillna(train_medians)
+    X_test = X_test.fillna(train_medians)
 
     print("Training XGBoost...")
     model = xgb.XGBRegressor(
