@@ -34,10 +34,15 @@ def train_model():
     X = df[features].copy()
     y = df["target_entitlement_score"]
 
-    print("Encoding categorical variables...")
-    encoder = LabelEncoder()
-    X["crop_type"] = encoder.fit_transform(X["crop_type"])
-    X["pm_kisan_status"] = encoder.fit_transform(X["pm_kisan_status"])
+    # print("Encoding categorical variables...")
+    # encoder = LabelEncoder()
+    # X["crop_type"] = encoder.fit_transform(X["crop_type"])
+    # X["pm_kisan_status"] = encoder.fit_transform(X["pm_kisan_status"])
+
+    print("One-hot encoding categorical variables...")
+    # One-hot avoids the fake ordering LabelEncoder imposes on categories
+    # (e.g. Rice=2 > Cotton=0), which would mislead the model.
+    X = pd.get_dummies(X, columns=["crop_type", "pm_kisan_status"])
 
     # print("Splitting data...")
     # X_train, X_test, y_train, y_test = train_test_split(
