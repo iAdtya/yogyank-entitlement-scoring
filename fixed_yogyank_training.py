@@ -39,10 +39,16 @@ def train_model():
     X["crop_type"] = encoder.fit_transform(X["crop_type"])
     X["pm_kisan_status"] = encoder.fit_transform(X["pm_kisan_status"])
 
-    print("Splitting data...")
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, shuffle=True
-    )
+    # print("Splitting data...")
+    # X_train, X_test, y_train, y_test = train_test_split(
+    #     X, y, test_size=0.2, random_state=42, shuffle=True
+    # )
+
+    # Splitting data based on time (application_year) rather than random split (train on 2022 and 2023, test on 2024) for better scoring of future farmers
+    print("Splitting data based on application_year")
+    is_train = df["application_year"] < 2024
+    X_train, X_test = X[is_train], X[~is_train]
+    y_train, y_test = y[is_train], y[~is_train]
 
     print("Training XGBoost...")
     model = xgb.XGBRegressor(
