@@ -8,6 +8,9 @@
 pip install -r requirements.txt
 python fixed_yogyank_training.py
 ```
+## Output
+<img width="621" height="128" alt="image" src="https://github.com/user-attachments/assets/0ebd204d-814c-4bb6-8111-8fce25f16102" />
+
 
 ## Files generated (in `artifacts/`, created when you run the script)
 - `model_pipeline.pkl` — full pipeline (impute + one-hot + XGBoost).
