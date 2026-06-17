@@ -19,8 +19,9 @@ def load_and_prep_data(path="farmer_scoring_sample_yogyank_round1.csv"):
 def train_model():
     df = load_and_prep_data()
 
-    print("Applying PM Kisan business policy...")
-    df.loc[df["pm_kisan_status"] == "No", "target_entitlement_score"] -= 150
+    # The PM Kisan business policy should be applied after the model is trained to avoid retraining if the policy changes
+    # print("Applying PM Kisan business policy...")
+    # df.loc[df["pm_kisan_status"] == "No", "target_entitlement_score"] -= 150
 
     features = [
         "land_area_acres",
