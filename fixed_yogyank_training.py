@@ -6,7 +6,7 @@ Notes: Model is performing well. Validation score looks good. Ready for producti
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+# from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import r2_score
 import xgboost as xgb
 import joblib
@@ -14,6 +14,18 @@ import joblib
 
 def load_and_prep_data(path="farmer_scoring_sample_yogyank_round1.csv"):
     return pd.read_csv(path)
+
+
+# PM-Kisan Gov policy
+# can change without retraining.
+PM_KISAN_PENALTY = 150.0
+
+
+def apply_policy(base_scores, pm_kisan_status):
+    """Apply the PM-Kisan rule on top of the model's base score."""
+    final = base_scores.copy()
+    final[pm_kisan_status.values == "No"] -= PM_KISAN_PENALTY
+    return final
 
 
 def train_model():
@@ -34,7 +46,6 @@ def train_model():
     ]
     categorical_cols = [
         "crop_type",
-        "pm_kisan_status",
         "district",
         "irrigation_type",
         "land_ownership",
@@ -42,6 +53,9 @@ def train_model():
         "sales_channel",
     ]
     features = numeric_cols + categorical_cols
+
+    # "pm_kisan_status" is NOT a model feature — it is a policy input, applied
+    # separately after prediction (see apply_policy). Keeps model and policy apart.
     # Excluded: "defaulted_in_next_12_months" (target leakage), "farmer_id"
     # (identifier), "application_year" (used only for the time split).
 
@@ -87,9 +101,16 @@ def train_model():
     )
     model.fit(X_train, y_train)
 
+    # Model predicts the BASE score from genuine features only.
     preds = model.predict(X_test)
     score = r2_score(y_test, preds)
     print(f"Validation R2 Score: {score:.4f} (Wow!)")
+
+    # Policy is applied separately, on top of the base score.
+    test_pm_kisan = df.loc[~is_train, "pm_kisan_status"]
+    final_scores = apply_policy(preds, test_pm_kisan)
+    print(f"PM-Kisan policy applied to {(test_pm_kisan == 'No').sum()} farmers "
+          f"(-{PM_KISAN_PENALTY:.0f} each), separate from the model.")
 
     joblib.dump(model, "xgboost_baseline.pkl")
     print("Model saved to xgboost_baseline.pkl")
