@@ -14,10 +14,6 @@ python fixed_yogyank_training.py
 
 ## Files generated (in `artifacts/`, created when you run the script)
 - `model_pipeline.pkl` — full pipeline (impute + one-hot + XGBoost).
-- `feature_list.json` — model features, policy feature, target.
-- `validation_summary.json` — holdout R² / MAE and the split rule.
-- `feature_importances.json` — global feature importances.
-- `metadata.json` — xgboost version, random seed, PM-Kisan constant.
 
 ## Key assumptions (feature availability)
 - **Dropped (leakage):** `defaulted_in_next_12_months` — a future outcome.
