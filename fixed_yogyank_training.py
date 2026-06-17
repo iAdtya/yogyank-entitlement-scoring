@@ -4,10 +4,12 @@ Author: Junior Data Scientist
 Notes: Model is performing well. Validation score looks good. Ready for production.
 """
 
+import json
+import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
 # from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_absolute_error
 import xgboost as xgb
 import joblib
 from sklearn.compose import ColumnTransformer
@@ -29,6 +31,21 @@ def apply_policy(base_scores, pm_kisan_status):
     final = base_scores.copy()
     final[pm_kisan_status.values == "No"] -= PM_KISAN_PENALTY
     return final
+
+
+def reason_codes(row, importances, medians, top_n=3):
+    """Plain-English reasons for one farmer's score: the top numeric features,
+    and whether the farmer is above/below the training median on each.
+    Deterministic and dependency-free, so the reasons are stable across runs."""
+    reasons = []
+    for feat in [f for f in importances if f in medians.index][:top_n]:
+        val = row[feat]
+        if pd.isna(val):
+            reasons.append(f"{feat}=missing (imputed)")
+        else:
+            side = "above" if val >= medians[feat] else "below"
+            reasons.append(f"{feat}={val:.2f} ({side} median {medians[feat]:.2f})")
+    return reasons
 
 
 def train_model():
@@ -134,6 +151,7 @@ def train_model():
     # Model predicts the BASE score from genuine features only.
     preds = model.predict(X_test)
     score = r2_score(y_test, preds)
+    mae = mean_absolute_error(y_test, preds)
     print(f"Validation R2 Score: {score:.4f} (Wow!)")
 
     # Policy is applied separately, on top of the base score.
@@ -142,8 +160,33 @@ def train_model():
     print(f"PM-Kisan policy applied to {(test_pm_kisan == 'No').sum()} farmers "
           f"(-{PM_KISAN_PENALTY:.0f} each), separate from the model.")
 
-    joblib.dump(model, "xgboost_baseline.pkl")
-    print("Model saved to xgboost_baseline.pkl")
+    # ---- Save reproducible artifacts (for review / re-running) ----
+    # Everything a reviewer needs to reproduce and audit this run: the full
+    # pipeline, the feature contract, the validation result, and version info.
+    os.makedirs("artifacts", exist_ok=True)
+    joblib.dump(model, "artifacts/model_pipeline.pkl")
+    with open("artifacts/feature_list.json", "w") as f:
+        json.dump({
+            "numeric_features": numeric_cols,
+            "categorical_features": categorical_cols,
+            "policy_feature": "pm_kisan_status",
+            "target": "target_entitlement_score",
+        }, f, indent=2)
+    with open("artifacts/validation_summary.json", "w") as f:
+        json.dump({
+            "r2": round(float(score), 4),
+            "mae": round(float(mae), 2),
+            "n_train": int(is_train.sum()),
+            "n_test": int((~is_train).sum()),
+            "split": "time-based: train year < 2024, test year == 2024",
+        }, f, indent=2)
+    with open("artifacts/metadata.json", "w") as f:
+        json.dump({
+            "xgboost_version": xgb.__version__,
+            "random_state": 42,
+            "pm_kisan_penalty": PM_KISAN_PENALTY,
+        }, f, indent=2)
+    print("Artifacts saved to ./artifacts/")
 
 
 if __name__ == "__main__":
