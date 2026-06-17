@@ -10,7 +10,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 import xgboost as xgb
 import joblib
-
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
 
 def load_and_prep_data(path="farmer_scoring_sample_yogyank_round1.csv"):
     return pd.read_csv(path)
@@ -67,10 +70,11 @@ def train_model():
     # X["crop_type"] = encoder.fit_transform(X["crop_type"])
     # X["pm_kisan_status"] = encoder.fit_transform(X["pm_kisan_status"])
 
-    print("One-hot encoding categorical variables...")
+    # print("One-hot encoding categorical variables...")
     # One-hot avoids the fake ordering LabelEncoder imposes on categories
     # (e.g. Rice=2 > Cotton=0), which would mislead the model.
-    X = pd.get_dummies(X, columns=categorical_cols)
+    # X = pd.get_dummies(X, columns=categorical_cols)
+    # ^ now handled INSIDE the Pipeline below (OneHotEncoder), so X stays raw.
 
     # print("Splitting data...")
     # X_train, X_test, y_train, y_test = train_test_split(
@@ -84,21 +88,47 @@ def train_model():
     y_train, y_test = y[is_train], y[~is_train]
 
     # Handle missing values (rainfall_deviation_pct and ndvi_score are ~15% null).
-    # Impute with the TRAIN median only, then apply to both, so no test-set
-    # information leaks into training.
-    train_medians = X_train[numeric_cols].median()
-    X_train = X_train.fillna(train_medians)
-    X_test = X_test.fillna(train_medians)
+    # Previously imputed by hand with the TRAIN median; now done INSIDE the
+    # Pipeline (SimpleImputer) so it is fit on train only and saved with the model.
+    # train_medians = X_train[numeric_cols].median()
+    # X_train = X_train.fillna(train_medians)
+    # X_test = X_test.fillna(train_medians)
 
-    print("Training XGBoost...")
-    model = xgb.XGBRegressor(
-        n_estimators=60,
-        max_depth=4,
-        learning_rate=0.1,
-        random_state=42,
-        n_jobs=1,
-        tree_method="hist",
-    )
+    # print("Training XGBoost...")
+    # model = xgb.XGBRegressor(
+    #     n_estimators=60,
+    #     max_depth=4,
+    #     learning_rate=0.1,
+    #     random_state=42,
+    #     n_jobs=1,
+    #     tree_method="hist",
+    # )
+    # model.fit(X_train, y_train)
+
+    # All preprocessing now lives INSIDE the pipeline: fit on train only and
+    # saved together with the model, so scoring new raw data is one call.
+    #   - numeric: median imputation
+    #   - categorical: most-frequent imputation + one-hot
+    #     (handle_unknown="ignore" stays safe for unseen categories at scoring)
+    print("Training XGBoost pipeline...")
+    preprocess = ColumnTransformer([
+        ("num", SimpleImputer(strategy="median"), numeric_cols),
+        ("cat", Pipeline([
+            ("impute", SimpleImputer(strategy="most_frequent")),
+            ("onehot", OneHotEncoder(handle_unknown="ignore")),
+        ]), categorical_cols),
+    ])
+    model = Pipeline([
+        ("preprocess", preprocess),
+        ("xgb", xgb.XGBRegressor(
+            n_estimators=60,
+            max_depth=4,
+            learning_rate=0.1,
+            random_state=42,
+            n_jobs=1,
+            tree_method="hist",
+        )),
+    ])
     model.fit(X_train, y_train)
 
     # Model predicts the BASE score from genuine features only.
